@@ -35,6 +35,7 @@ func generateInvoiceHandler(w http.ResponseWriter, r *http.Request) {
 	purchaseOrder := r.Form.Get("purchase_order")
 	companyName := r.Form.Get("company_name")
 	// Continue to parse other form fields as per the requirements
+	
 
 	// Connect to the PostgreSQL database
 	db, err := sql.Open("postgres", "postgres://invoiceuser:invoicepass@localhost/invoicedb?sslmode=disable")
