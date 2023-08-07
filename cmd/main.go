@@ -15,6 +15,11 @@ import (
 	_ "github.com/lib/pq" // Import the PostgreSQL driver
 )
 
+// @title Invoice Generator API
+// @version 1.0
+// @description This is an API for generating and managing invoices.
+// @host localhost:8080
+// @BasePath /
 func main() {
 	r := mux.NewRouter()
 	r.HandleFunc("/", indexHandler).Methods("GET")
@@ -28,6 +33,33 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 	t.Execute(w, nil)
 }
 
+// @Summary Generate Invoice
+// @Description Generate an invoice based on the provided data
+// @Tags Invoice
+// @Accept json
+// @Produce json
+// @Param invoice_number formData string true "Invoice Number"
+// @Param purchase_order formData string false "Purchase Order"
+// @Param company_name formData string true "Company Name"
+// @Param logo formData file false "Company Logo (JPG, JPEG, PNG, max 5MB)"
+// @Param bill_to formData string true "Bill To"
+// @Param currency formData string true "Currency"
+// @Param invoice_date formData string true "Invoice Date"
+// @Param due_date formData string true "Due Date"
+// @Param notes formData string false "Notes / Payment Terms"
+// @Param bank_account formData string false "Bank Account Details"
+// @Param sub_total formData number true "Sub Total"
+// @Param tax_percentage formData number false "Tax Percentage"
+// @Param discount_amount formData number false "Discount Amount"
+// @Param shipping_fee formData number false "Shipping Fee"
+// @Param total formData number true "Total"
+// @Param item_description formData array true "Item Description"
+// @Param unit_cost formData array true "Unit Cost"
+// @Param quantity formData array true "Quantity"
+// @Param amount formData array true "Amount"
+// @Success 200 {string} string "Invoice generated."
+// @Failure 400 {string} string "Bad Request"
+// @Router /generate-invoice [post]
 func generateInvoiceHandler(w http.ResponseWriter, r *http.Request) {
 	// Parse the form data to get the user's input
 	r.ParseMultipartForm(5 * 1024 * 1024) // 5MB file size limit for logo
@@ -35,7 +67,6 @@ func generateInvoiceHandler(w http.ResponseWriter, r *http.Request) {
 	purchaseOrder := r.Form.Get("purchase_order")
 	companyName := r.Form.Get("company_name")
 	// Continue to parse other form fields as per the requirements
-	
 
 	// Connect to the PostgreSQL database
 	db, err := sql.Open("postgres", "postgres://invoiceuser:invoicepass@localhost/invoicedb?sslmode=disable")
