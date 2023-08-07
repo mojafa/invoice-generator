@@ -1,0 +1,105 @@
+<!-- templates/index.html -->
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Invoice Generator</title>
+</head>
+<body>
+    <h1>Invoice Generator</h1>
+    <form action="/generate-invoice" method="post" enctype="multipart/form-data">
+        <label for="invoice_number">Invoice Number:</label>
+        <input type="text" id="invoice_number" name="invoice_number" required><br><br>
+
+        <label for="purchase_order">Purchase Order:</label>
+        <input type="text" id="purchase_order" name="purchase_order"><br><br>
+
+        <label for="company_name">Company Name:</label>
+        <input type="text" id="company_name" name="company_name" required><br><br>
+
+        <!-- Add other form fields as per the requirements -->
+        <!-- For example: -->
+
+        <label for="bill_to">Bill To:</label>
+        <input type="text" id="bill_to" name="bill_to" required><br><br>
+
+        <label for="currency">Currency:</label>
+        <select id="currency" name="currency">
+            <option value="USD">USD</option>
+            <option value="EUR">EUR</option>
+            <option value="GBP">GBP</option>
+            <!-- Add more currency options as needed -->
+        </select><br><br>
+
+        <label for="invoice_date">Invoice Date:</label>
+        <input type="date" id="invoice_date" name="invoice_date" required><br><br>
+
+        <label for="due_date">Due Date:</label>
+        <input type="date" id="due_date" name="due_date" required><br><br>
+
+        <!-- Add item fields dynamically using JavaScript -->
+        <div id="items">
+            <div>
+                <label for="item_description_1">Item Description:</label>
+                <input type="text" id="item_description_1" name="item_description[]" required>
+                <label for="unit_cost_1">Unit Cost:</label>
+                <input type="number" id="unit_cost_1" name="unit_cost[]" required>
+                <label for="quantity_1">Quantity:</label>
+                <input type="number" id="quantity_1" name="quantity[]" required>
+                <label for="amount_1">Amount:</label>
+                <input type="number" id="amount_1" name="amount[]" required>
+            </div>
+        </div>
+        <button type="button" onclick="addItem()">Add Item</button><br><br>
+
+        <label for="notes">Notes / Payment Terms:</label>
+        <textarea id="notes" name="notes" rows="4"></textarea><br><br>
+
+        <label for="bank_account">Bank Account Details:</label>
+        <textarea id="bank_account" name="bank_account" rows="4"></textarea><br><br>
+
+        <label for="sub_total">Sub Total:</label>
+        <input type="number" id="sub_total" name="sub_total" required><br><br>
+
+        <label for="tax_percentage">Tax Percentage:</label>
+        <input type="number" id="tax_percentage" name="tax_percentage"><br><br>
+
+        <label for="discount_amount">Discount Amount:</label>
+        <input type="number" id="discount_amount" name="discount_amount"><br><br>
+
+        <label for="shipping_fee">Shipping Fee:</label>
+        <input type="number" id="shipping_fee" name="shipping_fee"><br><br>
+
+        <label for="total">Total:</label>
+        <input type="number" id="total" name="total" required><br><br>
+
+        <label for="logo">Upload Logo (JPG, JPEG, PNG, max 5MB):</label>
+        <input type="file" id="logo" name="logo" accept="image/jpeg, image/png"><br><br>
+
+        <input type="submit" value="Generate Invoice">
+    </form>
+
+    <script>
+        // JavaScript function to add item fields dynamically
+        let itemId = 1;
+
+        function addItem() {
+            itemId++;
+            const itemsDiv = document.getElementById("items");
+
+            const newItemDiv = document.createElement("div");
+            newItemDiv.innerHTML = `
+                <label for="item_description_${itemId}">Item Description:</label>
+                <input type="text" id="item_description_${itemId}" name="item_description[]" required>
+                <label for="unit_cost_${itemId}">Unit Cost:</label>
+                <input type="number" id="unit_cost_${itemId}" name="unit_cost[]" required>
+                <label for="quantity_${itemId}">Quantity:</label>
+                <input type="number" id="quantity_${itemId}" name="quantity[]" required>
+                <label for="amount_${itemId}">Amount:</label>
+                <input type="number" id="amount_${itemId}" name="amount[]" required>
+            `;
+
+            itemsDiv.appendChild(newItemDiv);
+        }
+    </script>
+</body>
+</html>

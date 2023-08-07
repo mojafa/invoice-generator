@@ -1,0 +1,15 @@
+<!-- templates/invoice.html -->
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Generated Invoice</title>
+</head>
+<body>
+    <h2>Generated Invoice</h2>
+
+    <!-- Display the logo if available -->
+    {{ if . }}
+        <img src="{{ . }}" alt="Company Logo" width="200">
+    {{ end }}
+</body>
+</html>
