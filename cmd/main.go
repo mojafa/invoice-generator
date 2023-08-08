@@ -4,11 +4,13 @@ package main
 
 import (
 	"database/sql"
+	"fmt"
 	"html/template"
-	"io"
 	"net/http"
-	"os"
 
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/gorilla/mux"
 	"github.com/invoicing-microservice/pkg/invoice"
 	"github.com/jung-kurt/gofpdf"
@@ -85,24 +87,38 @@ func generateInvoiceHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Handle the logo upload (if provided) and save the logo path in the database
+
+	//using Amazon S3 involves additional setup and considerations
+	// configuring bucket permissions,
+	//  handling error cases, and
+	//  managing access to S3 resources.
 	logoPath := ""
 	file, _, err := r.FormFile("logo")
 	if err == nil {
 		defer file.Close()
-		// Save the logo to a temporary file or a cloud storage service
-		//use s3 bucket
+		// Upload the logo to an S3 bucket
+		sess, _ := session.NewSession(&aws.Config{
+			Region: aws.String("your-aws-region"), // Replace with your AWS region
+		})
 
-		// For this example, we'll save it to a "logo.png" file in the current directory
-		outFile, err := os.Create("logo.png")
+		// Specify the S3 bucket and key (path within the bucket) for the logo
+		bucket := "your-s3-bucket-name"
+		key := "logo.png"
+
+		// Upload the logo file to the S3 bucket
+		uploader := s3manager.NewUploader(sess)
+		_, err := uploader.Upload(&s3manager.UploadInput{
+			Bucket: aws.String(bucket),
+			Key:    aws.String(key),
+			Body:   file,
+		})
 		if err != nil {
-			http.Error(w, "Error saving the logo", http.StatusInternalServerError)
+			http.Error(w, "Error uploading the logo to S3", http.StatusInternalServerError)
 			return
 		}
-		defer outFile.Close()
-		io.Copy(outFile, file)
 
-		logoPath = "logo.png"
-		inv.LogoPath = logoPath
+		// Construct the S3 URL for the logo
+		logoPath = fmt.Sprintf("https://%s.s3.amazonaws.com/%s", bucket, key)
 	}
 
 	// Generate the PDF invoice
@@ -125,7 +141,6 @@ func generateInvoiceHandler(w http.ResponseWriter, r *http.Request) {
 	pdf.Cell(40, 10, "Total: "+inv.Total)
 	pdf.Cell(40, 10, "Logo Path: "+inv.LogoPath)
 
-	// Continue to add other invoice details to the PDF as per the requirements
 
 	// Save the PDF to a file or send it as a response for download
 	pdf.OutputFileAndClose("invoice.pdf")
