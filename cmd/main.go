@@ -3,10 +3,13 @@
 package main
 
 import (
+	"bytes"
 	"database/sql"
 	"fmt"
 	"html/template"
 	"net/http"
+	"os"
+	"strconv"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -141,9 +144,28 @@ func generateInvoiceHandler(w http.ResponseWriter, r *http.Request) {
 	pdf.Cell(40, 10, "Total: "+inv.Total)
 	pdf.Cell(40, 10, "Logo Path: "+inv.LogoPath)
 
-
 	// Save the PDF to a file or send it as a response for download
-	pdf.OutputFileAndClose("invoice.pdf")
+	// pdf.OutputFileAndClose("invoice.pdf")
+
+	// Save the PDF to a buffer
+	var pdfBuffer bytes.Buffer
+	pdf.Output(&pdfBuffer)
+
+	// If you want to save the PDF to a file
+	pdfFilePath := "invoice.pdf"
+	pdfFile, err := os.Create(pdfFilePath)
+	if err != nil {
+		http.Error(w, "Error creating PDF file", http.StatusInternalServerError)
+		return
+	}
+	defer pdfFile.Close()
+	pdfFile.Write(pdfBuffer.Bytes())
+
+	// If you want to send the PDF as a response for download
+	w.Header().Set("Content-Disposition", "attachment; filename=invoice.pdf")
+	w.Header().Set("Content-Type", "application/pdf")
+	w.Header().Set("Content-Length", strconv.Itoa(len(pdfBuffer.Bytes())))
+	w.Write(pdfBuffer.Bytes())
 
 	// Respond with the invoice.html template, passing the Invoice instance
 	t, _ := template.ParseFiles("templates/invoice.html")
