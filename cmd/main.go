@@ -1,5 +1,3 @@
-// cmd/main.go
-
 package main
 
 import (
@@ -17,7 +15,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/invoicing-microservice/pkg/invoice"
 	"github.com/jung-kurt/gofpdf"
-	_ "github.com/lib/pq" // Import the PostgreSQL driver
+	_ "github.com/lib/pq"
 )
 
 func main() {
@@ -35,8 +33,9 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func generateInvoiceHandler(w http.ResponseWriter, r *http.Request) {
-	// Parse the form data to get the user's input
 	r.ParseMultipartForm(5 * 1024 * 1024) // 5MB file size limit for logo
+
+	// Parse the form data to get the user's input
 	invoiceNumber := r.Form.Get("invoice_number")
 	purchaseOrder := r.Form.Get("purchase_order")
 	companyName := r.Form.Get("company_name")
@@ -46,19 +45,58 @@ func generateInvoiceHandler(w http.ResponseWriter, r *http.Request) {
 	currency := r.Form.Get("currency")
 	notes := r.Form.Get("notes")
 	bankAccount := r.Form.Get("bank_account")
-	subTotal := r.Form.Get("sub_total")
-	taxPercentage := r.Form.Get("tax_percentage")
-	discountAmount := r.Form.Get("discount_amount")
-	shippingFee := r.Form.Get("shipping_fee")
-	total := r.Form.Get("total")
 
-	// Continue to parse other form fields as per the requirements
+	// Collect user input arrays for line items
+	itemDescriptions := r.Form["item_description[]"]
+	unitCosts, _ := parseNumericArray(r.Form["unit_cost[]"])
+	quantities, _ := parseIntegerArray(r.Form["quantity[]"])
+	amounts, _ := parseNumericArray(r.Form["amount[]"])
+
+	for i := 0; i < len(itemDescriptions); i++ {
+		item := invoice.Item{
+			Description: itemDescriptions[i],
+			UnitCost:    unitCosts[i],
+			Quantity:    quantities[i],
+			Amount:      amounts[i],
+		}
+		items = append(items, item)
+	}
+	// Calculate sub total based on line item amounts
+	var subTotalValue float64
+	for _, item := range Items {
+		subTotalValue += item.Amount
+	}
+
+	// Parse user-provided inputs
+	subTotal, err := strconv.ParseFloat(r.Form.Get("sub_total"), 64)
+	if err != nil {
+		http.Error(w, "Invalid sub total value", http.StatusBadRequest)
+		return
+	}
+
+	taxPercentage, err := strconv.ParseFloat(r.Form.Get("tax_percentage"), 64)
+	if err != nil {
+		http.Error(w, "Invalid tax percentage value", http.StatusBadRequest)
+		return
+	}
+
+	discountAmount, err := strconv.ParseFloat(r.Form.Get("discount_amount"), 64)
+	if err != nil {
+		http.Error(w, "Invalid discount amount value", http.StatusBadRequest)
+		return
+	}
+
+	shippingFee, err := strconv.ParseFloat(r.Form.Get("shipping_fee"), 64)
+	if err != nil {
+		http.Error(w, "Invalid shipping fee value", http.StatusBadRequest)
+		return
+	}
+
+	// Calculate total based on user input
+	total := (subTotal+shippingFee)*(1+taxPercentage/100) - discountAmount
 
 	// Connect to the PostgreSQL database
-	// connectionString := "user=yourdbuser dbname=yourdbname sslmode=disable"
-	// db, err := sql.Open("postgres", connectionString)
 	db, err := sql.Open("postgres", "postgres://invoiceuser:invoicepass@localhost/invoicedb?sslmode=disable")
-
 	if err != nil {
 		http.Error(w, "Error connecting to the database", http.StatusInternalServerError)
 		return
@@ -66,8 +104,9 @@ func generateInvoiceHandler(w http.ResponseWriter, r *http.Request) {
 	defer db.Close()
 
 	// Insert the invoice data into the database
-	_, err = db.Exec(
-		"INSERT INTO invoices (invoice_number, purchase_order, company_name, invoice_date, due_date, bill_to, currency, notes, bank_account, sub_total, tax_percentage, discount_amount, shipping_fee, total, logo_path) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)",
+	// Insert the invoice data into the database
+	row := db.QueryRow(
+		"INSERT INTO invoices (invoice_number, purchase_order, company_name, invoice_date, due_date, bill_to, currency, notes, bank_account, sub_total, tax_percentage, discount_amount, shipping_fee, total, logo_path) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) RETURNING id",
 		invoiceNumber, purchaseOrder, companyName, invoiceDate, dueDate, billTo, currency, notes, bankAccount, subTotal, taxPercentage, discountAmount, shippingFee, total, logoPath,
 	)
 	if err != nil {
@@ -75,7 +114,28 @@ func generateInvoiceHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Get the inserted invoice ID
+	var invoiceID int
+	err = row.Scan(&invoiceID)
+	if err != nil {
+		http.Error(w, "Error retrieving inserted invoice ID", http.StatusInternalServerError)
+		return
+	}
+
+	// Insert line items into the database
+	for _, item := range items {
+		_, err = db.Exec(
+			"INSERT INTO line_items (invoice_id, description, unit_cost, quantity, amount) VALUES ($1, $2, $3, $4, $5)",
+			invoiceID, item.Description, item.UnitCost, item.Quantity, item.Amount,
+		)
+		if err != nil {
+			http.Error(w, "Error inserting line item into the database", http.StatusInternalServerError)
+			return
+		}
+	}
+
 	// Create an Invoice instance
+	var logoPath string
 	inv := invoice.Invoice{
 		InvoiceNumber:  invoiceNumber,
 		PurchaseOrder:  purchaseOrder,
@@ -92,7 +152,10 @@ func generateInvoiceHandler(w http.ResponseWriter, r *http.Request) {
 		ShippingFee:    shippingFee,
 		Total:          total,
 		LogoPath:       logoPath,
+		Items:          []invoice.Item{},
 	}
+
+	// Handle the logo upload (
 
 	// Handle the logo upload (if provided) and save the logo path in the database
 
@@ -100,7 +163,7 @@ func generateInvoiceHandler(w http.ResponseWriter, r *http.Request) {
 	// configuring bucket permissions,
 	//  handling error cases, and
 	//  managing access to S3 resources.
-	logoPath := ""
+
 	file, _, err := r.FormFile("logo")
 	if err == nil {
 		defer file.Close()
@@ -127,6 +190,9 @@ func generateInvoiceHandler(w http.ResponseWriter, r *http.Request) {
 
 		// Construct the S3 URL for the logo
 		logoPath = fmt.Sprintf("https://%s.s3.amazonaws.com/%s", bucket, key)
+	} else {
+		// Handle the case where no logo was provided
+		logoPath = ""
 	}
 
 	// Generate the PDF invoice
@@ -142,11 +208,11 @@ func generateInvoiceHandler(w http.ResponseWriter, r *http.Request) {
 	pdf.Cell(40, 10, "Currency: "+inv.Currency)
 	pdf.Cell(40, 10, "Notes: "+inv.Notes)
 	pdf.Cell(40, 10, "Bank Account: "+inv.BankAccount)
-	pdf.Cell(40, 10, "Sub Total: "+inv.SubTotal)
-	pdf.Cell(40, 10, "Tax Percentage: "+inv.TaxPercentage)
-	pdf.Cell(40, 10, "Discount Amount: "+inv.DiscountAmount)
-	pdf.Cell(40, 10, "Shipping Fee: "+inv.ShippingFee)
-	pdf.Cell(40, 10, "Total: "+inv.Total)
+	pdf.Cell(40, 10, "Sub Total: "+strconv.FormatFloat(inv.SubTotal, 'f', 2, 64))             // Convert float to string with 2 decimal places
+	pdf.Cell(40, 10, "Tax Percentage: "+strconv.FormatFloat(inv.TaxPercentage, 'f', 2, 64))   // Convert float to string with 2 decimal places
+	pdf.Cell(40, 10, "Discount Amount: "+strconv.FormatFloat(inv.DiscountAmount, 'f', 2, 64)) // Convert float to string with 2 decimal places
+	pdf.Cell(40, 10, "Shipping Fee: "+strconv.FormatFloat(inv.ShippingFee, 'f', 2, 64))       // Convert float to string with 2 decimal places
+	pdf.Cell(40, 10, "Total: "+strconv.FormatFloat(inv.Total, 'f', 2, 64))                    // Convert float to string with 2 decimal places
 	pdf.Cell(40, 10, "Logo Path: "+inv.LogoPath)
 
 	// Save the PDF to a file or send it as a response for download
@@ -173,6 +239,33 @@ func generateInvoiceHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write(pdfBuffer.Bytes())
 
 	// Respond with the invoice.html template, passing the Invoice instance
-	t, _ := template.ParseFiles("templates/invoice.html")
+	t, err := template.ParseFiles("templates/invoice.html")
+	if err != nil {
+		http.Error(w, "Error parsing invoice template", http.StatusInternalServerError)
+		return
+	}
 	t.Execute(w, inv)
+}
+func parseNumericArray(input []string) ([]float64, error) {
+	result := make([]float64, len(input))
+	for i, val := range input {
+		num, err := strconv.ParseFloat(val, 64)
+		if err != nil {
+			return nil, err // Return an error if parsing fails
+		}
+		result[i] = num
+	}
+	return result, nil
+}
+
+func parseIntegerArray(input []string) ([]int, error) {
+	result := make([]int, len(input))
+	for i, val := range input {
+		num, err := strconv.Atoi(val)
+		if err != nil {
+			return nil, err // Return an error if parsing fails
+		}
+		result[i] = num
+	}
+	return result, nil
 }
