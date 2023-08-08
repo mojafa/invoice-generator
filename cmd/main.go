@@ -34,7 +34,8 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 
 func generateInvoiceHandler(w http.ResponseWriter, r *http.Request) {
 	r.ParseMultipartForm(5 * 1024 * 1024) // 5MB file size limit for logo
-
+	// Create a slice to hold line items
+	var items []invoice.Item
 	// Parse the form data to get the user's input
 	invoiceNumber := r.Form.Get("invoice_number")
 	purchaseOrder := r.Form.Get("purchase_order")
@@ -52,6 +53,8 @@ func generateInvoiceHandler(w http.ResponseWriter, r *http.Request) {
 	quantities, _ := parseIntegerArray(r.Form["quantity[]"])
 	amounts, _ := parseNumericArray(r.Form["amount[]"])
 
+	var logoPath string
+
 	for i := 0; i < len(itemDescriptions); i++ {
 		item := invoice.Item{
 			Description: itemDescriptions[i],
@@ -63,8 +66,9 @@ func generateInvoiceHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	// Calculate sub total based on line item amounts
 	var subTotalValue float64
-	for _, item := range Items {
+	for _, item := range items {
 		subTotalValue += item.Amount
+
 	}
 
 	// Parse user-provided inputs
@@ -105,10 +109,14 @@ func generateInvoiceHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Insert the invoice data into the database
 	// Insert the invoice data into the database
+	var insertedID int // Variable to hold the returned id value
+
 	row := db.QueryRow(
 		"INSERT INTO invoices (invoice_number, purchase_order, company_name, invoice_date, due_date, bill_to, currency, notes, bank_account, sub_total, tax_percentage, discount_amount, shipping_fee, total, logo_path) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) RETURNING id",
 		invoiceNumber, purchaseOrder, companyName, invoiceDate, dueDate, billTo, currency, notes, bankAccount, subTotal, taxPercentage, discountAmount, shippingFee, total, logoPath,
 	)
+	err = row.Scan(&insertedID) // Scan the returned id value
+
 	if err != nil {
 		http.Error(w, "Error inserting data into the database", http.StatusInternalServerError)
 		return
@@ -135,7 +143,7 @@ func generateInvoiceHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Create an Invoice instance
-	var logoPath string
+
 	inv := invoice.Invoice{
 		InvoiceNumber:  invoiceNumber,
 		PurchaseOrder:  purchaseOrder,
@@ -246,6 +254,7 @@ func generateInvoiceHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	t.Execute(w, inv)
 }
+
 func parseNumericArray(input []string) ([]float64, error) {
 	result := make([]float64, len(input))
 	for i, val := range input {
