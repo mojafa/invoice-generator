@@ -55,7 +55,10 @@ func generateInvoiceHandler(w http.ResponseWriter, r *http.Request) {
 	// Continue to parse other form fields as per the requirements
 
 	// Connect to the PostgreSQL database
+	// connectionString := "user=yourdbuser dbname=yourdbname sslmode=disable"
+	// db, err := sql.Open("postgres", connectionString)
 	db, err := sql.Open("postgres", "postgres://invoiceuser:invoicepass@localhost/invoicedb?sslmode=disable")
+
 	if err != nil {
 		http.Error(w, "Error connecting to the database", http.StatusInternalServerError)
 		return
@@ -63,8 +66,10 @@ func generateInvoiceHandler(w http.ResponseWriter, r *http.Request) {
 	defer db.Close()
 
 	// Insert the invoice data into the database
-	_, err = db.Exec("INSERT INTO invoices (invoice_number, purchase_order, company_name) VALUES ($1, $2, $3)",
-		invoiceNumber, purchaseOrder, companyName)
+	_, err = db.Exec(
+		"INSERT INTO invoices (invoice_number, purchase_order, company_name, invoice_date, due_date, bill_to, currency, notes, bank_account, sub_total, tax_percentage, discount_amount, shipping_fee, total, logo_path) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)",
+		invoiceNumber, purchaseOrder, companyName, invoiceDate, dueDate, billTo, currency, notes, bankAccount, subTotal, taxPercentage, discountAmount, shippingFee, total, logoPath,
+	)
 	if err != nil {
 		http.Error(w, "Error inserting data into the database", http.StatusInternalServerError)
 		return
