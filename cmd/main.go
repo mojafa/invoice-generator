@@ -22,6 +22,9 @@ import (
 // @BasePath /
 func main() {
 	r := mux.NewRouter()
+	// Serve the Swagger UI at /swagger/index.html
+	r.PathPrefix("/swagger/").Handler(httpSwagger.WrapHandler)
+
 	r.HandleFunc("/", indexHandler).Methods("GET")
 	r.HandleFunc("/generate-invoice", generateInvoiceHandler).Methods("POST")
 	http.Handle("/", r)
