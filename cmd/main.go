@@ -177,11 +177,11 @@ func generateInvoiceHandler(w http.ResponseWriter, r *http.Request) {
 		defer file.Close()
 		// Upload the logo to an S3 bucket
 		sess, _ := session.NewSession(&aws.Config{
-			Region: aws.String("your-aws-region"), // Replace with your AWS region
+			Region: aws.String("us-east-1"), // Replace with your AWS region
 		})
 
 		// Specify the S3 bucket and key (path within the bucket) for the logo
-		bucket := "your-s3-bucket-name"
+		bucket := "logo-file-upload"
 		key := "logo.png"
 
 		// Upload the logo file to the S3 bucket
